@@ -1,0 +1,30 @@
+{
+  "name": "kss-worklet",
+  "version": "1.0.0",
+  "description": "",
+  "type": "module",
+  "main": "dist/index.js",
+  "scripts": {
+    "test": "echo \"Error: no test specified\" && exit 1",
+    "clean": "rm-cli --s -r dist public/js",
+    "build": "rm-cli -ss -r public/js && tsc && webpack",
+    "server": "http-server -c-1 ./public --ssl --key ./cert/localhost+2-key.pem --cert ./cert/localhost+2.pem"
+  },
+  "author": "Mitsutaka Okazaki",
+  "license": "MIT",
+  "devDependencies": {
+    "http-server": "^14.1.1",
+    "libkss-js": "^1.7.3",
+    "path-browserify": "^1.0.1",
+    "prettier": "^2.8.4",
+    "rm-cli": "^1.4.2",
+    "ts-loader": "^9.4.2",
+    "tslint": "^6.1.3",
+    "tslint-config-prettier": "^1.18.0",
+    "tslint-plugin-prettier": "^2.3.0",
+    "typescript": "^4.9.0",
+    "webpack": "^5.76.2",
+    "webpack-cli": "^5.0.1",
+    "worker-url": "^1.1.0"
+  }
+}

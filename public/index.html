@@ -1,0 +1,121 @@
+<!DOCTYPE html>
+<html>
+
+<head>
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <style>
+    * {
+      box-sizing: border-box;
+      padding: 0;
+      margin: 0;
+      font-family: monospace, sans-serif;
+    }
+
+    .list-item {
+      cursor: pointer;
+      display: flex;
+      align-items: center;
+    }
+
+    .list-item .content {
+      padding: 16px;
+      flex: 1;
+    }
+
+    .list-item .trailing {
+      padding: 16px;
+    }
+
+    .list-item:hover {
+      background-color: #c0c0c0;
+    }
+
+    .list-item button {
+      cursor: pointer;
+      padding: 8px;
+      background-color: #0080ff;
+      color: white;
+      border: none;
+      border-radius: 4px;
+    }
+  </style>
+</head>
+
+<body>
+  <div id="state"></div>
+  <div id="stat"></div>
+  <div>
+    <select id="processorType">
+      <option value="auto">Auto</option>
+      <option value="script">Script</option>
+      <option value="worklet">Worklet</option>
+    </select>
+  </div>
+  <div id="mgs-list"></div>
+  <template id="list-item-template">
+    <div class="list-item">
+      <div class="content"><span class="title">TITLE</span></div>
+      <div class="trailing"><button onclick="onTogglePause()">PAUSE</button></div>
+      <div class="trailing"><button onclick="onStop()">STOP</button></div>
+    </div>
+  </template>
+  <script type="module">
+    import { getCurrentPlayer, onChangeType, onPlay, onTogglePause, onStop } from './js/index.js';
+    window.onPlay = onPlay;
+    window.onStop = onStop;
+    window.onTogglePause = onTogglePause;
+    window.onChangeType = onChangeType;
+    window.getCurrentPlayer = getCurrentPlayer;
+  </script>
+  <script>
+
+    function play(url) {
+      const player = getCurrentPlayer();
+      player.onstatechange = (state) => {
+        document.getElementById('state').innerText = state;
+      };
+      player.onprogress = (stat) => {
+        document.getElementById('stat').innerText = `${stat.currentFrame}/${stat.bufferedFrames}${stat.isClosed ? '*' : ''}`;
+      }
+      onPlay(url);
+    }
+
+    const typeSelector = document.getElementById('processorType');
+    typeSelector.onchange = (ev) => {
+      onChangeType(ev.target.value);
+    };
+
+    function createListItem({ name, url }) {
+      const node = document.getElementById('list-item-template').content.cloneNode(true);
+      const title = node.querySelector('.title');
+      title.innerText = name;
+      node.querySelector('.content').addEventListener('click', () => play(url));
+      return node;
+    }
+    function buildMenu() {
+      const mmlRoot = 'https://raw.githubusercontent.com/mmlbox/';
+      const items = [];
+
+      for (let i = 1; i <= 17; i++) {
+        const id = i < 10 ? `0${i}` : `${i}`;
+        items.push({ name: `HYDLIDE3_${id}`, url: `${mmlRoot}hyd2413/main/fm_psg/mgs/hyd3_${id}.mgs` });
+      }
+      for (let i = 1; i <= 29; i++) {
+        const id = i < 10 ? `0${i}` : `${i}`;
+        items.push({ name: `YS1_${id}`, url: `${mmlRoot}ys2413/main/fm_psg/mgs/ys1ex_${id}.mgs` });
+      }
+      for (let i = 0; i <= 30; i++) {
+        const id = i < 10 ? `0${i}` : `${i}`;
+        items.push({ name: `YS2_${id}`, url: `${mmlRoot}ys2413/main/fm_psg/mgs/ys2ex_${id}.mgs` });
+      }
+
+      const list = document.getElementById('mgs-list');
+      for (const item of items) {
+        list.appendChild(createListItem(item));
+      }
+    }
+    buildMenu();
+  </script>
+</body>
+
+</html>
