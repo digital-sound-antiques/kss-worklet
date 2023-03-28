@@ -18,26 +18,30 @@ declare const AudioWorkletProcessor: {
 type ProcessorCtor = (new (options?: AudioWorkletNodeOptions) => AudioWorkletProcessorType);
 declare function registerProcessor(name: string, ctor: ProcessorCtor): void;
 
-export type StreamerWorkletState = 'initial' | 'playing' | 'paused' | 'stopped' | 'disposed';
+export type AudioRendererWorkletState = 'initial' | 'playing' | 'paused' | 'aborted' | 'stopped' | 'disposed';
 
-export type StreamerWorkletRequestType = 'play' | 'seek' | 'pause' | 'resume' | 'stop' | 'dispose';
+export type AudioRendererWorkletRequestType = 'play' | 'seek' | 'pause' | 'resume' | 'abort' | 'dispose';
 
-export type StreamerWorkletRequest = {
-  type: StreamerWorkletRequestType;
-  inputPort?: MessagePort;
-  seekPos?: number;
+export type AudioRendererWorkletRequest = {
+  type: AudioRendererWorkletRequestType;
+  inputPort?: MessagePort | null;
+  seekPos?: number | null;
+  relative?: boolean | null;
 };
 
-export type StreamerWorkletRequestWithSeq = { seq: number; } & StreamerWorkletRequest;
+export type AudioRendererWorkletRequestWithSeq = { seq: number; } & AudioRendererWorkletRequest;
 
-export type StreamerWorkletResponse = {
+export type AudioRendererWorkletResponse = {
   seq: number;
-  type: StreamerWorkletRequestType;
+  type: AudioRendererWorkletRequestType;
   data?: any;
   error?: any;
 };
 
-export class StreamerWorkletProcessor extends AudioWorkletProcessor {
+// AudioWorkletGlobalScope
+declare const sampleRate: number;
+
+export class AudioRendererWorkletProcessor extends AudioWorkletProcessor {
   static get parameterDescriptors() {
     return [];
   }
@@ -45,8 +49,8 @@ export class StreamerWorkletProcessor extends AudioWorkletProcessor {
   constructor(options: any) {
     super(options);
     this.port.onmessage = async (ev) => {
-      let res: StreamerWorkletResponse;
-      const req = ev.data as StreamerWorkletRequestWithSeq;
+      let res: AudioRendererWorkletResponse;
+      const req = ev.data as AudioRendererWorkletRequestWithSeq;
       try {
         const data = await this._onCommand(req);
         res = { seq: req.seq, type: req.type, data: data };
@@ -55,11 +59,11 @@ export class StreamerWorkletProcessor extends AudioWorkletProcessor {
       }
       this.port.postMessage(res);
     }
+    this._buffer = new WaveBuffer(sampleRate);
   }
 
   private _inputPort: MessagePort | null = null;
-
-  private _buffer: WaveBuffer = new WaveBuffer();
+  private _buffer: WaveBuffer;
 
   _reset() {
     this._buffer.clear();
@@ -70,16 +74,14 @@ export class StreamerWorkletProcessor extends AudioWorkletProcessor {
     }
   }
 
-  private _state: StreamerWorkletState = 'initial';
+  private _state: AudioRendererWorkletState = 'initial';
 
-  _setState(state: StreamerWorkletState) {
-    console.log(`StreamerWorkletProcessor: ${state}`);
+  _setState(state: AudioRendererWorkletState) {
     this._state = state;
-    this.port.postMessage({ type: 'state', state: state });
+    this.port.postMessage({ type: 'state', state });
   }
 
-  async _onCommand(cmd: StreamerWorkletRequest): Promise<any> {
-    console.log(cmd.type);
+  async _onCommand(cmd: AudioRendererWorkletRequest): Promise<any> {
     switch (cmd.type) {
       case 'play':
         if (this._state != 'disposed') {
@@ -88,7 +90,7 @@ export class StreamerWorkletProcessor extends AudioWorkletProcessor {
           this._inputPort!.onmessage = (ev) => this._buffer.write(ev.data);
           this._setState('playing');
         } else {
-          console.error('Streamer worklet cannot be used after being disposed.');
+          console.error('This object has already been disposed.');
         }
         return;
       case 'pause':
@@ -97,22 +99,24 @@ export class StreamerWorkletProcessor extends AudioWorkletProcessor {
         }
         return;
       case 'seek':
-        this._buffer.seekTo(cmd.seekPos!);
+        this._buffer.seekTo(cmd.seekPos!, cmd.relative);
+        if (this._state == 'stopped') {
+          this._setState('playing');
+        }
         return;
       case 'resume':
         if (this._state == 'paused') {
           this._setState('playing');
         }
         return;
-      case 'stop':
+      case 'abort':
         this._reset();
-        this._setState('stopped');
+        this._setState('aborted');
         return;
       case 'dispose':
         this._reset();
         this.port.onmessage = null;
         this._setState('disposed');
-        // this.port.close();
         return;
     }
   }
@@ -122,11 +126,14 @@ export class StreamerWorkletProcessor extends AudioWorkletProcessor {
       return false;
     }
     if (this._state == 'playing') {
-      this._buffer.onAudioWorkletProcess(inputs, outputs);
+      const res = this._buffer.onAudioWorkletProcess(inputs, outputs);
       this.port.postMessage({
         type: 'progress',
         stat: this._buffer.stat,
       });
+      if (!res) {
+        this._setState('stopped');
+      }
     }
     return true;
   }

@@ -1,6 +1,6 @@
-import { AudioDecoderRequest, AudioDecoderResponse } from './decoder-worker';
+import { AudioDecoderProgress, AudioDecoderRequest, AudioDecoderResponse } from './workers/audio-decoder-worker';
 
-export class AudioDecoderController {
+export class AudioDecoder {
   _worker: Worker | null;
   _seq: number = 0;
 
@@ -9,9 +9,19 @@ export class AudioDecoderController {
     this._worker.onmessage = (ev: MessageEvent) => this._handleMessage(ev);
   }
 
-  _completerMap: { [key: number]: (res: AudioDecoderResponse) => void } = {};
+  onprogress: ((data: AudioDecoderProgress) => void) | null = null;
 
-  _handleMessage(ev: MessageEvent): void {
+  private _completerMap: { [key: number]: (res: AudioDecoderResponse) => void } = {};
+
+  private _handleMessage(ev: MessageEvent): void {
+
+    if (ev.data?.type == 'progress') {
+      if (this.onprogress != null) {
+        this.onprogress(ev.data.data);
+      }
+      return;
+    }
+
     const seq = ev.data?.seq as number;
     if (seq != null) {
       const completer = this._completerMap[seq];
@@ -39,20 +49,16 @@ export class AudioDecoderController {
     });
   }
 
-  async init() {
-    await this._request({ type: 'init' });
+  async init(sampleRate: number) {
+    await this._request({ type: 'init', args: { sampleRate } });
   }
 
   async start(outputPort: MessagePort, args?: any) {
     await this._request({ type: 'start', outputPort, args }, [outputPort]);
   }
 
-  async status(): Promise<{isRunning: boolean;}> {
-    return this._request({ type: 'status' });
-  }
-
-  async stop(): Promise<boolean> {
-    return this._request({ type: 'stop' });
+  async abort(): Promise<boolean> {
+    return this._request({ type: 'abort' });
   }
 
   terminate() {

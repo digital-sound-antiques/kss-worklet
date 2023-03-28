@@ -8,13 +8,73 @@
       box-sizing: border-box;
       padding: 0;
       margin: 0;
-      font-family: monospace, sans-serif;
+      font-family: sans-serif;
+      user-select: none;
+    }
+
+    html {
+      max-height: 100%;
+    }
+
+    body {
+      position: absolute;
+      display: flex;
+      flex-direction: column;
+      justify-content: center;
+      align-items: center;
+      top: 0;
+      bottom: 0;
+      left: 0;
+      right: 0;
+      background-color: #808080;
+    }
+
+    #overlay-stat {
+      text-align: right;
+      padding: 8px;
+      font-size: 12px;
+      line-height: 150%;
+      position: absolute;
+      top: 0;
+      left: 0;
+      right: 0;
+    }
+
+    #player-frame {
+      display: flex;
+      flex-direction: column;
+      background-color: white;
+      border-radius: 12px;
+      overflow: hidden;
+    }
+
+    @media screen and (max-width: 479px) {
+      #player-frame {
+        min-width: 100%;
+        border-radius: 0;
+      }
+    }
+
+    @media screen and (min-width: 480px) {
+      #player-frame {
+        max-width: 600px;
+        max-height: 75%;
+      }
+    }
+
+    #mgs-list {
+      border-top: 1px solid #ccc;
+      position: relative;
+      top: 0;
+      bottom: 0;
+      overflow: scroll;
     }
 
     .list-item {
       cursor: pointer;
       display: flex;
       align-items: center;
+      font-size: 14px;
     }
 
     .list-item .content {
@@ -27,7 +87,7 @@
     }
 
     .list-item:hover {
-      background-color: #c0c0c0;
+      background-color: rgba(0, 128, 255, 0.15);
     }
 
     .list-item button {
@@ -38,84 +98,137 @@
       border: none;
       border-radius: 4px;
     }
+
+    #wave-box {
+      height: 128px;
+      padding-top: 16px;
+      background-color: #efeff4;
+    }
+
+    #analyser {
+      width: 100%;
+      height: 100%;
+    }
+
+    #player .button-box {
+      display: flex;
+      justify-content: center;
+      align-items: center;
+    }
+
+    #player .button {
+      cursor: pointer;
+      margin: 8px;
+      display: flex;
+      flex-direction: column;
+      justify-content: center;
+      align-items: center;
+      border-radius: 18px;
+      width: 36px;
+      height: 36px;
+      background-color: none;
+    }
+
+    #player .button:hover {
+      background-color: #efeff4;
+    }
+
+    #player .main-button {
+      cursor: pointer;
+      margin: 8px;
+      display: flex;
+      flex-direction: column;
+      justify-content: center;
+      align-items: center;
+      border-radius: 24px;
+      width: 48px;
+      height: 48px;
+      background-color: #0080ff;
+      color: white;
+    }
+
+    #player .hidden {
+      display: none;
+    }
+
+    #player .main-button:hover {
+      opacity: 0.9;
+    }
+
+    .list-item.selected {
+      background-color: #efeff4;
+    }
+
+    .input-range {
+      -webkit-appearance: none;
+      appearance: none;
+      background-color: #c7c7c7;
+      height: 2px;
+      width: 100%;
+    }
+
+    .input-range:focus,
+    .input-range:active {
+      outline: none;
+    }
+
+    .input-range::-webkit-slider-thumb {
+      -webkit-appearance: none;
+      appearance: none;
+      cursor: pointer;
+      position: relative;
+      border: none;
+      width: 6px;
+      height: 6px;
+      display: block;
+      background-color: #0080ff;
+      border-radius: 50%;
+      -webkit-border-radius: 50%;
+    }
   </style>
+  <link href="https://fonts.googleapis.com/icon?family=Material+Icons" rel="stylesheet">
 </head>
 
 <body>
-  <div id="state"></div>
-  <div id="stat"></div>
-  <div>
+  <div id="overlay-stat">
     <select id="processorType">
-      <option value="auto">Auto</option>
+      <option value="worklet" selected>Worklet</option>
       <option value="script">Script</option>
-      <option value="worklet">Worklet</option>
     </select>
+    <div id="renderer"></div>
+    <div id="decoder"></div>
   </div>
-  <div id="mgs-list"></div>
-  <template id="list-item-template">
-    <div class="list-item">
-      <div class="content"><span class="title">TITLE</span></div>
-      <div class="trailing"><button onclick="onTogglePause()">PAUSE</button></div>
-      <div class="trailing"><button onclick="onStop()">STOP</button></div>
+  <div id="player-frame">
+    <div id="player">
+      <div id="wave-box">
+        <canvas id="analyser"></canvas>
+      </div>
+      <div class="button-box">
+        <div id="next" class="button" onclick="lib.prev()"><span class="material-icons">skip_previous</span></div>
+        <div id="back" class="button" onclick="lib.replay()"><span class="material-icons">replay</span></div>
+        <div id="rev" class="button" onclick="lib.rev()"><span class="material-icons">replay_10</span></div>
+        <div id="play" class="main-button" onclick="lib.resume()"><span class="material-icons">play_arrow</span></div>
+        <div id="pause" class="main-button" onclick="lib.pause()"><span class="material-icons">pause</span></div>
+        <div id="fwd" class="button" onclick="lib.fwd()"><span class="material-icons">forward_10</span></div>
+        <div id="back" class="button"><span class="material-icons">repeat</span></div>
+        <div id="next" class="button" onclick="lib.next()"><span class="material-icons">skip_next</span></div>
+      </div>
     </div>
-  </template>
-  <script type="module">
-    import { getCurrentPlayer, onChangeType, onPlay, onTogglePause, onStop } from './js/index.js';
-    window.onPlay = onPlay;
-    window.onStop = onStop;
-    window.onTogglePause = onTogglePause;
-    window.onChangeType = onChangeType;
-    window.getCurrentPlayer = getCurrentPlayer;
-  </script>
-  <script>
-
-    function play(url) {
-      const player = getCurrentPlayer();
-      player.onstatechange = (state) => {
-        document.getElementById('state').innerText = state;
-      };
-      player.onprogress = (stat) => {
-        document.getElementById('stat').innerText = `${stat.currentFrame}/${stat.bufferedFrames}${stat.isClosed ? '*' : ''}`;
-      }
-      onPlay(url);
-    }
-
-    const typeSelector = document.getElementById('processorType');
-    typeSelector.onchange = (ev) => {
-      onChangeType(ev.target.value);
-    };
-
-    function createListItem({ name, url }) {
-      const node = document.getElementById('list-item-template').content.cloneNode(true);
-      const title = node.querySelector('.title');
-      title.innerText = name;
-      node.querySelector('.content').addEventListener('click', () => play(url));
-      return node;
-    }
-    function buildMenu() {
-      const mmlRoot = 'https://raw.githubusercontent.com/mmlbox/';
-      const items = [];
-
-      for (let i = 1; i <= 17; i++) {
-        const id = i < 10 ? `0${i}` : `${i}`;
-        items.push({ name: `HYDLIDE3_${id}`, url: `${mmlRoot}hyd2413/main/fm_psg/mgs/hyd3_${id}.mgs` });
-      }
-      for (let i = 1; i <= 29; i++) {
-        const id = i < 10 ? `0${i}` : `${i}`;
-        items.push({ name: `YS1_${id}`, url: `${mmlRoot}ys2413/main/fm_psg/mgs/ys1ex_${id}.mgs` });
-      }
-      for (let i = 0; i <= 30; i++) {
-        const id = i < 10 ? `0${i}` : `${i}`;
-        items.push({ name: `YS2_${id}`, url: `${mmlRoot}ys2413/main/fm_psg/mgs/ys2ex_${id}.mgs` });
-      }
-
-      const list = document.getElementById('mgs-list');
-      for (const item of items) {
-        list.appendChild(createListItem(item));
-      }
-    }
-    buildMenu();
-  </script>
+    <div style="padding: 0 16px 4px 16px">
+      <input id="slider" class="input-range" type="range" min="0" max="0" value="0" />
+    </div>
+    <div id="mgs-list"></div>
+    <template id="list-item-template">
+      <div class="list-item">
+        <div class="content"><span class="title">TITLE</span></div>
+      </div>
+    </template>
+    <script type="module">
+      import * as lib from './js/index.js';
+      lib.main();
+      window.lib = lib;
+    </script>
+  </div>
 </body>
 
 </html>

@@ -1,43 +1,16 @@
-import { WorkerUrl } from 'worker-url';
-import { AudioPlayer, AudioStreamerType } from './player';
-import { KSSDecoderStartOptions } from './workers/kss-decoder-worker';
+import { KSSPlayer } from './kss-player';
 
-// The `name` option of WorkerUrl is a marker to determine the webpack's chunkname (i.e. output filename).
-// Do not use variable to specify the name - It must be written as an immediate string.
-const decoderUrl = new WorkerUrl(new URL('./workers/kss-decoder-worker.ts', import.meta.url), { name: 'kss-decorder' });
-const workletUrl = new WorkerUrl(new URL('./workers/streamer-worklet.ts', import.meta.url), { name: 'streamer' });
+let player: KSSPlayer;
 
-export class KSSPlayer extends AudioPlayer {
-  constructor(args: { streamerType?: 'script' | 'worklet' | null, sampleRate?: number }) {
-    super({
-      sampleRate: args.sampleRate,
-      streamerType: args.streamerType,
-      decoderWorkerUrl: decoderUrl,
-      recycleDecoder: true,
-      streamerWorkletUrl: workletUrl,
-      streamerWorkletName: 'streamer',
-    });
-  }
-  async play(args: KSSDecoderStartOptions): Promise<void> {
-    super.play(args);
-  }
-}
-
-const sampleRate = 44100;
-
-let player: KSSPlayer | null;
-let playerMap: { [key: string]: KSSPlayer } = {};
+export const audioContext = new AudioContext({ sampleRate: 44100 });
+export const analyser = audioContext.createAnalyser();
 
 (async () => {
   try {
-    const autoPlayer = playerMap['auto'] = new KSSPlayer({ sampleRate });
-    const scriptPlayer = playerMap['script'] = new KSSPlayer({ streamerType: 'script', sampleRate });
-    const workletPlayer = playerMap['worklet'] = new KSSPlayer({ streamerType: 'worklet', sampleRate });
-
-    await autoPlayer.init();
-    await scriptPlayer.init();
-    await workletPlayer.init();
-    player = autoPlayer;
+    player = new KSSPlayer('worklet');
+    player.connect(analyser);
+    analyser.connect(audioContext.destination);
+    analyser.fftSize = 256;
     // Note: A secure connection is required to update a global variable from a module.
   } catch (e) {
     console.error(e);
@@ -46,38 +19,202 @@ let playerMap: { [key: string]: KSSPlayer } = {};
   }
 })();
 
-export function getCurrentPlayer(): KSSPlayer {
-  return player!;
+type WebkitAudioContextState = AudioContextState | 'interrupted';
+
+const dataBuf = new Uint8Array(analyser.fftSize / 2);
+const waveBuf = new Float32Array(analyser.fftSize);
+
+function renderAnalyzer() {
+
+  requestAnimationFrame(renderAnalyzer);
+
+  if (player.state == 'playing') {
+    const canvas = document.getElementById('analyser') as HTMLCanvasElement;
+    const width = canvas.width;
+    const height = canvas.height;
+    const ctx = canvas.getContext('2d')!;
+
+    ctx.clearRect(0, 0, width, height);
+
+    analyser.getByteFrequencyData(dataBuf); //Spectrum Data
+    ctx.fillStyle = '#0080ff';
+    for (let i = 0; i < width; i += 4) {
+      const h = dataBuf[Math.floor(i * dataBuf.length / width)];
+      ctx.fillRect(i, height - h, 3, h);
+    }
+
+    analyser.getFloatTimeDomainData(waveBuf);
+
+    ctx.lineWidth = 2;
+    ctx.fillStyle = 'none';
+    ctx.strokeStyle = '#ff0000';
+    ctx.beginPath();
+    ctx.moveTo(0, height / 2);
+    const sliceWidth = width / waveBuf.length;
+    let x = 0;
+    for (let i = 0; i < waveBuf.length; i++) {
+      const y = height / 2 + waveBuf[i] * 400;
+      if (i == 0) {
+        ctx.moveTo(x, y);
+      } else {
+        ctx.lineTo(x, y);
+      }
+      x += sliceWidth;
+    }
+    ctx.lineTo(width, height / 2);
+    ctx.stroke();
+  }
 }
 
-export async function onChangeType(type: AudioStreamerType): Promise<void> {
-  player = playerMap[type] || playerMap['auto'];
-}
+export function main() {
 
-export async function onPlay(url: URL | string): Promise<void> {
-  for(const key in playerMap) {
-    const p = await playerMap[key];
-    if (p != player) { p.stop() };
+  renderAnalyzer();
+
+  document.addEventListener("visibilitychange", () => {
+    if (document.visibilityState === "visible" && (audioContext.state as WebkitAudioContextState) == 'interrupted') {
+    /* unawaited */audioContext.resume();
+    }
+  });
+  document.getElementById('pause')!.classList.add('hidden');
+
+  const typeSelector = document.getElementById('processorType')!;
+  typeSelector.onchange = (ev) => {
+    player.changeRendererType((ev.target as HTMLSelectElement).value as any);
+  };
+
+  function createListItem({ name, url }: { name: string; url: string; }) {
+    const node = (document.getElementById('list-item-template') as HTMLTemplateElement)!.content.cloneNode(true) as DocumentFragment;
+    const title = node.querySelector('.title') as HTMLElement;
+    title.innerText = name;
+    const listItem = node.querySelector('.list-item') as HTMLElement;
+    listItem.dataset.url = url;
+
+    listItem.addEventListener('click', () => playItem(listItem));
+
+    return node;
   }
 
-  await player?.unlockAudio();
-  console.log(`fetch start: ${url}`);
+  function buildMenu() {
+    const mmlRoot = 'https://raw.githubusercontent.com/mmlbox/';
+    const items = [];
+
+    for (let i = 1; i <= 17; i++) {
+      const id = i < 10 ? `0${i}` : `${i}`;
+      items.push({ name: `HYDLIDE3_${id}`, url: `${mmlRoot}hyd2413/main/fm_psg/mgs/hyd3_${id}.mgs` });
+    }
+    for (let i = 1; i <= 29; i++) {
+      const id = i < 10 ? `0${i}` : `${i}`;
+      items.push({ name: `YS1_${id}`, url: `${mmlRoot}ys2413/main/fm_psg/mgs/ys1ex_${id}.mgs` });
+    }
+    for (let i = 0; i <= 30; i++) {
+      const id = i < 10 ? `0${i}` : `${i}`;
+      items.push({ name: `YS2_${id}`, url: `${mmlRoot}ys2413/main/fm_psg/mgs/ys2ex_${id}.mgs` });
+    }
+    for (let i = 0; i <= 59; i++) {
+      const id = i < 10 ? `00${i}` : `0${i}`;
+      items.push({ name: `SOR_${id}`, url: `${mmlRoot}sor2413/main/fm_psg/mgs/en/soe${id}.mgs` });
+    }
+
+    const list = document.getElementById('mgs-list') as HTMLElement;
+    for (const item of items) {
+      list.appendChild(createListItem(item));
+    }
+  }
+
+  buildMenu();
+}
+
+let selectedUrl: URL | string;
+let kss: ArrayBuffer;
+
+function playItem(item: Element | null) {
+  if (item instanceof HTMLElement && item.classList.contains('list-item')) {
+    document.querySelectorAll('.list-item').forEach((el) => el.classList.remove('selected'));
+    item.classList.add('selected');
+    const url = item.dataset.url!;
+    selectedUrl = url;
+    play();
+  }
+}
+
+export async function load(url: URL | string) {
   const res = await fetch(url);
-  const data = await res.arrayBuffer();
-  console.log(`fetch complete`);
-  await player?.play({ data, sampleRate });
+  kss = await res.arrayBuffer();
 }
 
-export async function onTogglePause(): Promise<void> {
-  if (player?.state == 'playing') {
-    await player?.pause();
-  } else if (player?.state == 'paused') {
-    await player?.resume();
+export async function resumeAudioContext() {
+  await audioContext.resume();
+}
+
+export async function replay() {
+  await player.seekInTime(0);
+}
+
+export async function play() {
+
+  await resumeAudioContext();
+  await load(selectedUrl);
+
+  if (kss == null) {
+    return;
+  }
+
+  player.onstatechange = (state) => {
+    if (state == 'playing') {
+      document.getElementById('play')!.classList.add('hidden');
+      document.getElementById('pause')!.classList.remove('hidden');
+    } else {
+      document.getElementById('play')!.classList.remove('hidden');
+      document.getElementById('pause')!.classList.add('hidden');
+    }
+
+    if (state == 'stopped') {
+      next();
+    }
+  };
+  player.onprogress = (data) => {
+    document.getElementById('decoder')!.innerText = `${data.decoder?.decodeFrames} ${data.decoder?.decodeSpeed?.toFixed(2)}x ${data.decoder?.isDecoding ? '' : '*'}`;
+    document.getElementById('renderer')!.innerText = `${data.renderer?.currentTime}/${data.renderer?.bufferedTime} ${data.renderer?.currentFrame}/${data.renderer?.bufferedFrames}${data.renderer?.isFulFilled ? '*' : ''}`;
+    if (data.renderer != null) {
+      const slider = document.getElementById('slider') as HTMLInputElement;
+      slider.max = `${data.renderer.bufferedFrames}`;
+      slider.value = `${data.renderer.currentFrame}`;
+    }
+  }
+  return player.play({ data: kss });
+}
+
+export async function rev() {
+  return player.seekInTime(-10000, true);
+}
+
+export async function fwd() {
+  return player.seekInTime(10000, true);
+}
+
+export async function pause() {
+  return player.pause();
+}
+
+export async function resume() {
+  return player.resume();
+}
+
+export async function abort() {
+  return await player.abort();
+}
+
+export async function next() {
+  const item = document.querySelector('.list-item.selected');
+  if (item instanceof HTMLElement) {
+    playItem(item.nextElementSibling);
   }
 }
 
-export async function onStop(): Promise<void> {
-  for(const key in playerMap) {
-    await playerMap[key].stop();
+export async function prev() {
+  const item = document.querySelector('.list-item.selected');
+  if (item instanceof HTMLElement) {
+    playItem(item.previousElementSibling);
   }
 }
+

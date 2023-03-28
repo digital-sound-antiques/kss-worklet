@@ -4,9 +4,15 @@ export type AudioDecoderRequest = {
   args?: any;
 }
 
+export type AudioDecoderProgress = {
+  decodeFrames: number;
+  decodeSpeed: number;
+  isDecoding: boolean;
+};
+
 export type AudioDecoderRequestWithSeq = { seq: number; } & AudioDecoderRequest;
 
-export type AudioDecoderRequestType = 'init' | 'start' | 'stop' | 'status' | 'dispose' | 'unknown';
+export type AudioDecoderRequestType = 'init' | 'start' | 'abort' | 'dispose' | 'unknown';
 
 export type AudioDecoderResponse = {
   seq: number;
@@ -43,15 +49,12 @@ class InternalProcessor<T> {
 
 export abstract class AudioDecoderWorker {
 
-  _worker: Worker;
-
   constructor(worker: Worker) {
     this._worker = worker;
     this._worker.onmessage = async (e) => {
       let res: AudioDecoderResponse;
       const req = e.data as AudioDecoderRequestWithSeq;
       try {
-        // console.log(`AudioDecoderWorker ${req.type}@${req.seq} latency:${Date.now() - (req as any).ts}ms`);
         const data = await this._onRequest(req);
         res = { seq: req.seq, type: req.type, data: data };
       } catch (e) {
@@ -61,10 +64,10 @@ export abstract class AudioDecoderWorker {
     }
   }
 
+  private _worker: Worker;
   private _outputPort: MessagePort | null = null;
-  private _totalFrames: number = 0;
 
-  _detachPort() {
+  private _detachPort() {
     if (this._outputPort != null) {
       this._outputPort!.onmessage = null;
       this._outputPort?.close();
@@ -72,13 +75,17 @@ export abstract class AudioDecoderWorker {
     }
   }
 
-  _processorId: number = 0;
-  _processor: InternalProcessor<void> | null = null;
+  private _processorId: number = 0;
+  private _processor: InternalProcessor<void> | null = null;
 
-  async _onRequest(req: AudioDecoderRequest): Promise<any> {
+  private _sampleRate: number = 44100;
+  get sampleRate() { return this._sampleRate; }
+
+  private async _onRequest(req: AudioDecoderRequest): Promise<any> {
     switch (req.type) {
       case 'init':
-        await this.init();
+        this._sampleRate = req.args.sampleRate;
+        await this.init(req.args);
         break;
       case 'start':
         if (this._processor != null) {
@@ -88,14 +95,9 @@ export abstract class AudioDecoderWorker {
         await this.start(req.args);
         this._run();
         return;
-      case 'status':
-        return {
-          isRunning: this._processor != null,
-          totalFrames: this._totalFrames,
-        };
-      case 'stop':
+      case 'abort':
         await this._abort();
-        await this.stop();
+        await this.abort();
         this._detachPort();
         return;
       case 'dispose':
@@ -108,38 +110,50 @@ export abstract class AudioDecoderWorker {
     }
   }
 
-  async _run() {
-    this._totalFrames = 0;
+  private _dispatchProgress(elapsed: number, decodeFrames: number, isDecoding: boolean) {
+    const decodeSpeed = elapsed != 0 ? (decodeFrames / this.sampleRate * 1000) / elapsed : 0;
+    this._worker.postMessage({
+      type: 'progress', data: {
+        decodeFrames,
+        decodeSpeed,
+        isDecoding,
+      }
+    });
+  }
+
+  private async _run() {
+    const start = Date.now();
+    let decodeFrames = 0;
     this._processor = new InternalProcessor(this._processorId++, async (parent) => {
       while (!parent.aborted) {
         const array = await this.process();
         if (array != null) {
-          this._totalFrames += array?.length;
+          decodeFrames += array?.length;
           this._outputPort?.postMessage(array, [array.buffer]);
         } else {
           this._outputPort?.postMessage(null);
           break;
         }
-        await new Promise((resolve) => setTimeout(resolve, 1));
+        this._dispatchProgress(Date.now() - start, decodeFrames, true);
+        await new Promise((resolve) => setTimeout(resolve, 0));
       }
-      console.log(`processor#${parent.id} is complete.`);
     });
     await this._processor.run();
+    this._dispatchProgress(Date.now() - start, decodeFrames, false);
     this._processor = null;
   }
 
-  async _abort() {
+  private async _abort() {
     if (this._processor != null) {
       const id = this._processor.id;
       await this._processor.abort();
-      console.log(`processor#${id} is aborted.`);
       this._processor = null;
     }
   }
 
-  abstract init(): Promise<void>;
+  abstract init(args: any): Promise<void>;
   abstract start(args: any): Promise<void>;
   abstract process(): Promise<Int16Array | Int32Array | Float32Array | null>;
-  abstract stop(): Promise<void>;
+  abstract abort(): Promise<void>;
   abstract dispose(): Promise<void>;
 }
