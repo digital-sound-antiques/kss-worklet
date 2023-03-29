@@ -35,8 +35,8 @@ export default {
     outputModule: true,
   },
   output: {
-    publicPath: '/js/',
-    path: path.resolve(__dirname, 'docs/js'),
+    publicPath: '/kss-worklet/js/',
+    path: path.resolve(__dirname, 'public/kss-worklet/js'),
     filename: '[name].js',
     library: {
       type: 'module'

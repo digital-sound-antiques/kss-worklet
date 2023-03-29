@@ -190,7 +190,7 @@ eval("/* (ignored) */\n\n//# sourceURL=webpack://kss-worklet/path_(ignored)?");
 /******/ 
 /******/ /* webpack/runtime/publicPath */
 /******/ (() => {
-/******/ 	__webpack_require__.p = "/js/";
+/******/ 	__webpack_require__.p = "/kss-worklet/js/";
 /******/ })();
 /******/ 
 /******/ /* webpack/runtime/importScripts chunk loading */

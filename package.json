@@ -6,9 +6,9 @@
   "main": "dist/index.js",
   "scripts": {
     "test": "echo \"Error: no test specified\" && exit 1",
-    "clean": "rm-cli -ss -r dist docs/js",
-    "build": "rm-cli -ss -r docs/js && tsc && webpack",
-    "server": "http-server -c-1 ./docs --ssl --key ./cert/localhost+2-key.pem --cert ./cert/localhost+2.pem"
+    "clean": "rm-cli -ss -r dist public/kss-worklet/js",
+    "build": "rm-cli -ss -r public/kss-worklet/js && tsc && webpack",
+    "server": "http-server -c-1 ./public -o kss-worklet --ssl --key ./cert/localhost+2-key.pem --cert ./cert/localhost+2.pem"
   },
   "author": "Mitsutaka Okazaki",
   "license": "MIT",
