@@ -1,5 +1,5 @@
 import { KSS, KSSPlay } from 'libkss-js';
-import { AudioDecoderWorker } from './audio-decoder-worker';
+import { AudioDecoderWorker } from 'webaudio-stream-player';
 
 export type KSSDecoderStartOptions = {
   data: Uint8Array | ArrayBuffer | ArrayBufferLike | ArrayLike<number>;
@@ -50,8 +50,8 @@ class KSSDecoderWorker extends AudioDecoderWorker {
     this._decodeFrames = 0;
   }
 
-  async process(): Promise<Int16Array | null> {
-  
+  async process(): Promise<Array<Int16Array> | null> {
+
     if (this._kssplay?.getFadeFlag() == 2 || this._kssplay?.getStopFlag() != 0) {
       return null;
     }
@@ -68,7 +68,7 @@ class KSSDecoderWorker extends AudioDecoderWorker {
       return null;
     }
 
-    return this._kssplay!.calc(this.sampleRate);
+    return [this._kssplay!.calc(this.sampleRate)];
   }
 
   async abort(): Promise<void> {

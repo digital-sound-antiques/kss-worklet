@@ -1,4 +1,4 @@
-import { KSSPlayer } from './kss-player';
+import { KSSPlayer } from './kss-player.js';
 
 let player: KSSPlayer;
 
@@ -66,6 +66,43 @@ function renderAnalyzer() {
   }
 }
 
+function createListItem({ name, url }: { name: string; url: string; }) {
+  const node = (document.getElementById('list-item-template') as HTMLTemplateElement)!.content.cloneNode(true) as DocumentFragment;
+  const title = node.querySelector('.title') as HTMLElement;
+  title.innerText = name;
+  const listItem = node.querySelector('.list-item') as HTMLElement;
+  listItem.dataset.url = url;
+  listItem.addEventListener('click', () => playItem(listItem));
+  return node;
+}
+
+function buildMenu() {
+  const mmlRoot = 'https://raw.githubusercontent.com/mmlbox/';
+  const items = [];
+
+  for (let i = 1; i <= 17; i++) {
+    const id = i < 10 ? `0${i}` : `${i}`;
+    items.push({ name: `HYDLIDE3_${id}`, url: `${mmlRoot}hyd2413/main/fm_psg/mgs/hyd3_${id}.mgs` });
+  }
+  for (let i = 1; i <= 29; i++) {
+    const id = i < 10 ? `0${i}` : `${i}`;
+    items.push({ name: `YS1_${id}`, url: `${mmlRoot}ys2413/main/fm_psg/mgs/ys1ex_${id}.mgs` });
+  }
+  for (let i = 0; i <= 30; i++) {
+    const id = i < 10 ? `0${i}` : `${i}`;
+    items.push({ name: `YS2_${id}`, url: `${mmlRoot}ys2413/main/fm_psg/mgs/ys2ex_${id}.mgs` });
+  }
+  for (let i = 0; i <= 59; i++) {
+    const id = i < 10 ? `00${i}` : `0${i}`;
+    items.push({ name: `SOR_${id}`, url: `${mmlRoot}sor2413/main/fm_psg/mgs/en/soe${id}.mgs` });
+  }
+
+  const list = document.getElementById('mgs-list') as HTMLElement;
+  for (const item of items) {
+    list.appendChild(createListItem(item));
+  }
+}
+
 export function main() {
 
   renderAnalyzer();
@@ -82,50 +119,25 @@ export function main() {
     player.changeRendererType((ev.target as HTMLSelectElement).value as any);
   };
 
-  function createListItem({ name, url }: { name: string; url: string; }) {
-    const node = (document.getElementById('list-item-template') as HTMLTemplateElement)!.content.cloneNode(true) as DocumentFragment;
-    const title = node.querySelector('.title') as HTMLElement;
-    title.innerText = name;
-    const listItem = node.querySelector('.list-item') as HTMLElement;
-    listItem.dataset.url = url;
-
-    listItem.addEventListener('click', () => playItem(listItem));
-
-    return node;
-  }
-
-  function buildMenu() {
-    const mmlRoot = 'https://raw.githubusercontent.com/mmlbox/';
-    const items = [];
-
-    for (let i = 1; i <= 17; i++) {
-      const id = i < 10 ? `0${i}` : `${i}`;
-      items.push({ name: `HYDLIDE3_${id}`, url: `${mmlRoot}hyd2413/main/fm_psg/mgs/hyd3_${id}.mgs` });
-    }
-    for (let i = 1; i <= 29; i++) {
-      const id = i < 10 ? `0${i}` : `${i}`;
-      items.push({ name: `YS1_${id}`, url: `${mmlRoot}ys2413/main/fm_psg/mgs/ys1ex_${id}.mgs` });
-    }
-    for (let i = 0; i <= 30; i++) {
-      const id = i < 10 ? `0${i}` : `${i}`;
-      items.push({ name: `YS2_${id}`, url: `${mmlRoot}ys2413/main/fm_psg/mgs/ys2ex_${id}.mgs` });
-    }
-    for (let i = 0; i <= 59; i++) {
-      const id = i < 10 ? `00${i}` : `0${i}`;
-      items.push({ name: `SOR_${id}`, url: `${mmlRoot}sor2413/main/fm_psg/mgs/en/soe${id}.mgs` });
-    }
-
-    const list = document.getElementById('mgs-list') as HTMLElement;
-    for (const item of items) {
-      list.appendChild(createListItem(item));
-    }
-  }
+  const slider = document.getElementById('slider') as HTMLInputElement;
+  slider.addEventListener('input', () => {
+    console.log('input');
+    sliderDragging = true;
+  });
+  slider.addEventListener('change', () => {
+    console.log('change');
+    sliderDragging = false;
+    player.seekInFrame(parseInt(slider.value));
+  });
 
   buildMenu();
+
+  installDragStage();
 }
 
 let selectedUrl: URL | string;
 let kss: ArrayBuffer;
+let sliderDragging = false;
 
 function playItem(item: Element | null) {
   if (item instanceof HTMLElement && item.classList.contains('list-item')) {
@@ -178,7 +190,9 @@ export async function play() {
     if (data.renderer != null) {
       const slider = document.getElementById('slider') as HTMLInputElement;
       slider.max = `${data.renderer.bufferedFrames}`;
-      slider.value = `${data.renderer.currentFrame}`;
+      if (!sliderDragging) {
+        slider.value = `${data.renderer.currentFrame}`;
+      }
     }
   }
   return player.play({ data: kss });
@@ -218,3 +232,104 @@ export async function prev() {
   }
 }
 
+function installDragStage() {
+  // const elem = document.body;
+  // elem.addEventListener("dragover", onDragOver);
+  // elem.addEventListener("dragenter", onDragEnter);
+  // elem.addEventListener("dragleave", onDragLeave);
+  // elem.addEventListener("drop", onDrop);
+
+  const playerFrame = document.getElementById('player-frame')!;
+
+  playerFrame.addEventListener('dragenter', (e: DragEvent) => {
+    e.preventDefault();
+  });
+
+  playerFrame.addEventListener('dragover', (e: DragEvent) => {
+    const listItem = (e.target as HTMLElement)?.closest('.list-item');
+    if (listItem instanceof HTMLElement) {
+      listItem.classList.add('drop-focus');
+      e.dataTransfer!.dropEffect = 'copy';
+    } else {
+      playerFrame.style.border = 'red 2px solid';
+      e.dataTransfer!.dropEffect = 'move';
+    }
+    e.preventDefault();
+  });
+
+  playerFrame.addEventListener('dragleave', (e) => {
+    const listItem = (e.target as HTMLElement)?.closest('.list-item');
+    if (listItem instanceof HTMLElement) {
+      listItem.classList.remove('drop-focus');
+    } else {
+      playerFrame.style.border = 'none';
+    }
+  });
+
+  playerFrame.addEventListener('drop', (e) => {
+    playerFrame.style.border = 'none';
+    onDrop(e);
+  });
+}
+
+async function onDrop(e: DragEvent) {
+  console.log(e.target);
+  e.preventDefault();
+  const insertBefore = (e.target as HTMLElement)?.closest('.list-item') as HTMLElement | null;
+  if (insertBefore) {
+    insertBefore!.classList.remove('drop-focus');
+  }
+  return loadFiles(e.dataTransfer!.files, insertBefore);
+}
+
+async function loadFiles(files: FileList, insertBefore: HTMLElement | null) {
+  const items = [];
+
+  for (const file of files) {
+    try {
+      const u8 = await loadFromFile(file);
+      const base64EncodedData = btoa(String.fromCharCode.apply(null, u8 as any));
+      const mimeType = 'application/octet-binary';
+      const dataURI = `data:${mimeType};base64,${base64EncodedData}`;
+      items.push(createListItem({ name: file.name, url: dataURI }));
+    } catch (e) {
+      console.warn(e);
+    }
+  }
+
+  if (items.length > 0) {
+    const list = document.getElementById('mgs-list') as HTMLElement;
+    if (insertBefore != null) {
+      for (const item of items) {
+        list.insertBefore(item, insertBefore);
+      }
+    } else {
+      list.innerText = '';
+      const target = items[0].querySelector('.list-item');
+      for (const item of items) {
+        list.appendChild(item);
+      }
+      playItem(target);
+    }
+  }
+}
+
+async function loadFromFile(blob: Blob): Promise<Uint8Array> {
+  return new Promise<Uint8Array>((resolve, reject) => {
+    const reader = new FileReader();
+    reader.onloadend = () => {
+      try {
+        const u = new Uint8Array(reader.result as ArrayBuffer);
+        let version = 6 < u.length ? String.fromCharCode(u[0], u[1], u[2], u[3], u[4], u[5]) : null;
+        if (version && version.indexOf("MGS") === 0) {
+          resolve(u);
+          return;
+        }
+        throw new Error('Not a MGS file');
+      } catch (e) {
+        reject(e);
+      }
+    };
+    reader.readAsArrayBuffer(blob);
+  });
+}

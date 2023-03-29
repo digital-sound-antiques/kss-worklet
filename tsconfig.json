@@ -6,11 +6,9 @@
     "outDir": "./dist",
     "rootDir": "./src",
     "strict": true,
-    "esModuleInterop": true,
     "moduleResolution": "node"
   },
   "exclude": [
-    "js",
     "dist",
     "**/__tests__/**/*"
   ]

@@ -36,7 +36,7 @@ export default {
   },
   output: {
     publicPath: '/js/',
-    path: path.resolve(__dirname, 'public/js'),
+    path: path.resolve(__dirname, 'doc/js'),
     filename: '[name].js',
     library: {
       type: 'module'
