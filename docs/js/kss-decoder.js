@@ -200,7 +200,7 @@ eval("/* (ignored) */\n\n//# sourceURL=webpack://kss-worklet/path_(ignored)?");
 /******/ 	// object to store loaded chunks
 /******/ 	// "1" means "already loaded"
 /******/ 	var installedChunks = {
-/******/ 		"kss-decorder": 1
+/******/ 		"kss-decoder": 1
 /******/ 	};
 /******/ 	
 /******/ 	// importScripts chunk loading
