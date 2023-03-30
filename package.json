@@ -7,8 +7,9 @@
   "scripts": {
     "test": "echo \"Error: no test specified\" && exit 1",
     "clean": "rm-cli -ss -r dist public/kss-worklet/js",
-    "build": "rm-cli -ss -r public/kss-worklet/js && tsc && webpack",
-    "build:dev": "rm-cli -ss -r public/kss-worklet/js && tsc && webpack --mode development",
+    "prepare": "npm run build",
+    "build": "npm run clean && webpack",
+    "build:dev": "npm run clean && webpack -w --mode development",
     "server": "http-server -c-1 ./public -o kss-worklet --ssl --key ./cert/localhost+2-key.pem --cert ./cert/localhost+2.pem"
   },
   "author": "Mitsutaka Okazaki",

@@ -104,4 +104,4 @@ dist
 .tern-port
 
 cert/*.pem
-public/js/*
+public/kss-worklet/js/*
