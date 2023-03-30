@@ -4,7 +4,7 @@ import WorkerUrlPlugin from 'worker-url/plugin.js';
 const __dirname = path.dirname(new URL(import.meta.url).pathname);
 
 export default {
-  mode: 'development',
+  mode: 'production',
   // devtool: 'source-map',
   entry: {
     index: './src/index.ts',
@@ -17,7 +17,7 @@ export default {
     },
     fallback: {
       fs: false,
-      path: false,
+      path: false
     }
   },
   module: {

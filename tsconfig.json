@@ -6,7 +6,9 @@
     "outDir": "./dist",
     "rootDir": "./src",
     "strict": true,
-    "moduleResolution": "node"
+    "esModuleInterop": true,
+    "moduleResolution": "node16",
+    "noImplicitOverride": true
   },
   "exclude": [
     "dist",
