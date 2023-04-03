@@ -14,7 +14,7 @@ export const gain = audioContext.createGain() as GainNode;
     player = createKSSPlayer("worklet");
     player.connect(gain);
     gain.connect(analyser);
-    gain.gain.value = 2.0;
+    gain.gain.value = 3.0;
     analyser.connect(audioContext.destination);
     analyser.fftSize = 256;
     // Note: A secure connection is required to update a global variable from a module.
