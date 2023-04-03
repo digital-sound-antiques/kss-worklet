@@ -8,6 +8,7 @@ export default {
   // devtool: 'source-map',
   entry: {
     index: './src/index.ts',
+    "kss-player": './src/kss-player.ts',
   },
   resolve: {
     extensions: ['.js', ',jsx', '.ts', '.tsx'],
