@@ -84,12 +84,7 @@ function createListItem({ name, url }: { name: string; url: string }) {
 
 function buildMenu() {
   const mmlRoot = "https://raw.githubusercontent.com/mmlbox/";
-  const items = [
-    {
-      name: "contrail",
-      url: "https://raw.githubusercontent.com/digital-sound-antiques/msxplay-js/main/public/demo/contrail.mgs",
-    },
-  ];
+  const items = [];
 
   for (let i = 1; i <= 17; i++) {
     const id = i < 10 ? `0${i}` : `${i}`;
